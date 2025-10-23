@@ -8,20 +8,17 @@ import (
 
 // ExtensionToLang maps file extensions to language identifiers
 var ExtensionToLang = map[string]string{
-	".go": LangGo,
-	".c":  LangC,
-	".h":  LangC,
-	// Future extensions commented out:
-	// ".cpp": LangCpp,
-	// ".cc":  LangCpp,
-	// ".cxx": LangCpp,
-	// ".hpp": LangCpp,
-	// ".hxx": LangCpp,
-	// ".py":  LangPy,
-	// ".ts":  LangTS,
-	// ".js":  LangJS,
-	// ".jsx": LangJS,
-	// ".tsx": LangTS,
+	".go":  LangGo,
+	".c":   LangC,
+	".h":   LangC,
+	".cpp": LangCpp,
+	".cc":  LangCpp,
+	".cxx": LangCpp,
+	".hpp": LangCpp,
+	".hxx": LangCpp,
+	".hh":  LangCpp,
+	".py":  LangPy,
+	".ts":  LangTS,
 }
 
 // DetectLanguage determines the programming language of a file based on its extension
@@ -46,6 +43,12 @@ func ParseFile(filepath string) ([]Symbol, error) {
 		return parseGoFile(filepath)
 	case LangC:
 		return parseCFile(filepath)
+	case LangCpp:
+		return parseCppFile(filepath)
+	case LangPy:
+		return parsePythonFile(filepath)
+	case LangTS:
+		return parseTypeScriptFile(filepath)
 	default:
 		return nil, fmt.Errorf("parser not implemented for language: %s", lang)
 	}

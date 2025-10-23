@@ -229,6 +229,475 @@ func TestParseGoFile(t *testing.T) {
 	}
 }
 
+func TestParseCppFile(t *testing.T) {
+	testFile := filepath.Join("testdata", "cpp", "functions.cpp")
+
+	symbols, err := parseCppFile(testFile)
+	if err != nil {
+		t.Fatalf("Failed to parse C++ file: %v", err)
+	}
+
+	// Expected symbols: simpleFunction, add, Calculator (class), Calculator::add (method),
+	// Calculator::multiply (method), Calculator::getValue (method), compute, main
+	// Plus Calculator constructor
+	if len(symbols) == 0 {
+		t.Error("Expected to find symbols in C++ file")
+	}
+
+	// Count functions, methods, and classes
+	var functionCount, methodCount, classCount int
+	for _, sym := range symbols {
+		if sym.Lang != LangCpp {
+			t.Errorf("Expected language %s, got %s for symbol %s", LangCpp, sym.Lang, sym.Name)
+		}
+		switch sym.Kind {
+		case "function":
+			functionCount++
+		case "method":
+			methodCount++
+		case "class":
+			classCount++
+		default:
+			t.Errorf("Unexpected kind %s for symbol %s", sym.Kind, sym.Name)
+		}
+	}
+
+	// We should have functions (simpleFunction, add, compute, main)
+	if functionCount == 0 {
+		t.Error("Expected to find at least one function")
+	}
+	// We should have methods (Calculator::add, Calculator::multiply, Calculator::getValue, plus constructor)
+	if methodCount == 0 {
+		t.Error("Expected to find at least one method")
+	}
+	// We should have classes (Calculator)
+	if classCount == 0 {
+		t.Error("Expected to find at least one class")
+	}
+
+	// Test specific function: add
+	var addFunc *Symbol
+	for i := range symbols {
+		if symbols[i].Name == "add" && symbols[i].Kind == "function" {
+			addFunc = &symbols[i]
+			break
+		}
+	}
+
+	if addFunc == nil {
+		t.Fatal("Expected to find 'add' function")
+	}
+
+	// Check add function details
+	if addFunc.QualifiedName != "add" {
+		t.Errorf("Expected qualified name 'add', got %s", addFunc.QualifiedName)
+	}
+
+	if len(addFunc.Params) != 2 {
+		t.Errorf("Expected 2 parameters for add, got %d", len(addFunc.Params))
+	}
+
+	// Check ID format
+	expectedIDPrefix := "cpp:" + testFile
+	if len(addFunc.ID) < len(expectedIDPrefix) || addFunc.ID[:len(expectedIDPrefix)] != expectedIDPrefix {
+		t.Errorf("Expected ID to start with %s, got %s", expectedIDPrefix, addFunc.ID)
+	}
+
+	// Test method: Calculator::add
+	var calcAddMethod *Symbol
+	for i := range symbols {
+		if symbols[i].Name == "add" && symbols[i].Kind == "method" {
+			calcAddMethod = &symbols[i]
+			break
+		}
+	}
+
+	if calcAddMethod == nil {
+		t.Fatal("Expected to find Calculator::add method")
+	}
+
+	// Check qualified name for method
+	if calcAddMethod.QualifiedName != "Calculator::add" {
+		t.Errorf("Expected qualified name 'Calculator::add', got %s", calcAddMethod.QualifiedName)
+	}
+
+	// Check metadata for class name
+	if calcAddMethod.Metadata == nil {
+		t.Error("Expected metadata for method")
+	} else {
+		if _, ok := calcAddMethod.Metadata["class_name"]; !ok {
+			t.Error("Expected class_name in metadata")
+		}
+	}
+
+	// Test class: Calculator
+	var calcClass *Symbol
+	for i := range symbols {
+		if symbols[i].Name == "Calculator" && symbols[i].Kind == "class" {
+			calcClass = &symbols[i]
+			break
+		}
+	}
+
+	if calcClass == nil {
+		t.Fatal("Expected to find Calculator class")
+	}
+
+	// Check class details
+	if calcClass.QualifiedName != "Calculator" {
+		t.Errorf("Expected qualified name 'Calculator', got %s", calcClass.QualifiedName)
+	}
+
+	// Test function with calls: compute
+	var computeFunc *Symbol
+	for i := range symbols {
+		if symbols[i].Name == "compute" {
+			computeFunc = &symbols[i]
+			break
+		}
+	}
+
+	if computeFunc == nil {
+		t.Fatal("Expected to find 'compute' function")
+	}
+
+	// Check that compute has callees
+	if len(computeFunc.Callees) == 0 {
+		t.Error("Expected compute to have callees")
+	}
+
+	// Check for specific callees
+	foundAdd := false
+	foundSimple := false
+	for _, callee := range computeFunc.Callees {
+		if callee.Name == "add" {
+			foundAdd = true
+		}
+		if callee.Name == "simpleFunction" {
+			foundSimple = true
+		}
+	}
+
+	if !foundAdd {
+		t.Error("Expected compute to call 'add'")
+	}
+	if !foundSimple {
+		t.Error("Expected compute to call 'simpleFunction'")
+	}
+}
+
+func TestParsePythonFile(t *testing.T) {
+	testFile := filepath.Join("testdata", "python", "functions.py")
+
+	symbols, err := parsePythonFile(testFile)
+	if err != nil {
+		t.Fatalf("Failed to parse Python file: %v", err)
+	}
+
+	// Expected symbols: simple_function, add, multiply, Calculator (class),
+	// Calculator.__init__, Calculator.add, Calculator.multiply_value, Calculator.get_value, compute
+	if len(symbols) == 0 {
+		t.Error("Expected to find symbols in Python file")
+	}
+
+	// Count functions, methods, and classes
+	var functionCount, methodCount, classCount int
+	for _, sym := range symbols {
+		if sym.Lang != LangPy {
+			t.Errorf("Expected language %s, got %s for symbol %s", LangPy, sym.Lang, sym.Name)
+		}
+		switch sym.Kind {
+		case "function":
+			functionCount++
+		case "method":
+			methodCount++
+		case "class":
+			classCount++
+		default:
+			t.Errorf("Unexpected kind %s for symbol %s", sym.Kind, sym.Name)
+		}
+	}
+
+	// We should have functions (simple_function, add, multiply, compute)
+	if functionCount == 0 {
+		t.Error("Expected to find at least one function")
+	}
+	// We should have methods (__init__, add, multiply_value, get_value)
+	if methodCount == 0 {
+		t.Error("Expected to find at least one method")
+	}
+	// We should have classes (Calculator)
+	if classCount == 0 {
+		t.Error("Expected to find at least one class")
+	}
+
+	// Test specific function: add
+	var addFunc *Symbol
+	for i := range symbols {
+		if symbols[i].Name == "add" && symbols[i].Kind == "function" {
+			addFunc = &symbols[i]
+			break
+		}
+	}
+
+	if addFunc == nil {
+		t.Fatal("Expected to find 'add' function")
+	}
+
+	// Check add function details
+	if addFunc.QualifiedName != "add" {
+		t.Errorf("Expected qualified name 'add', got %s", addFunc.QualifiedName)
+	}
+
+	if len(addFunc.Params) != 2 {
+		t.Errorf("Expected 2 parameters for add, got %d", len(addFunc.Params))
+	}
+
+	// Check ID format
+	expectedIDPrefix := "py:" + testFile
+	if len(addFunc.ID) < len(expectedIDPrefix) || addFunc.ID[:len(expectedIDPrefix)] != expectedIDPrefix {
+		t.Errorf("Expected ID to start with %s, got %s", expectedIDPrefix, addFunc.ID)
+	}
+
+	// Test method: Calculator.add
+	var calcAddMethod *Symbol
+	for i := range symbols {
+		if symbols[i].Name == "add" && symbols[i].Kind == "method" {
+			calcAddMethod = &symbols[i]
+			break
+		}
+	}
+
+	if calcAddMethod == nil {
+		t.Fatal("Expected to find Calculator.add method")
+	}
+
+	// Check qualified name for method
+	if calcAddMethod.QualifiedName != "Calculator.add" {
+		t.Errorf("Expected qualified name 'Calculator.add', got %s", calcAddMethod.QualifiedName)
+	}
+
+	// Check metadata for class name
+	if calcAddMethod.Metadata == nil {
+		t.Error("Expected metadata for method")
+	} else {
+		if _, ok := calcAddMethod.Metadata["class_name"]; !ok {
+			t.Error("Expected class_name in metadata")
+		}
+	}
+
+	// Test class: Calculator
+	var calcClass *Symbol
+	for i := range symbols {
+		if symbols[i].Name == "Calculator" && symbols[i].Kind == "class" {
+			calcClass = &symbols[i]
+			break
+		}
+	}
+
+	if calcClass == nil {
+		t.Fatal("Expected to find Calculator class")
+	}
+
+	// Check class details
+	if calcClass.QualifiedName != "Calculator" {
+		t.Errorf("Expected qualified name 'Calculator', got %s", calcClass.QualifiedName)
+	}
+
+	// Test function with calls: compute
+	var computeFunc *Symbol
+	for i := range symbols {
+		if symbols[i].Name == "compute" {
+			computeFunc = &symbols[i]
+			break
+		}
+	}
+
+	if computeFunc == nil {
+		t.Fatal("Expected to find 'compute' function")
+	}
+
+	// Check that compute has callees
+	if len(computeFunc.Callees) == 0 {
+		t.Error("Expected compute to have callees")
+	}
+
+	// Check for specific callees
+	foundAdd := false
+	foundSimple := false
+	for _, callee := range computeFunc.Callees {
+		if callee.Name == "add" {
+			foundAdd = true
+		}
+		if callee.Name == "simple_function" {
+			foundSimple = true
+		}
+	}
+
+	if !foundAdd {
+		t.Error("Expected compute to call 'add'")
+	}
+	if !foundSimple {
+		t.Error("Expected compute to call 'simple_function'")
+	}
+}
+
+func TestParseTypeScriptFile(t *testing.T) {
+	testFile := filepath.Join("testdata", "typescript", "functions.ts")
+
+	symbols, err := parseTypeScriptFile(testFile)
+	if err != nil {
+		t.Fatalf("Failed to parse TypeScript file: %v", err)
+	}
+
+	// Expected symbols: simpleFunction, add, greet, Calculator (class),
+	// Calculator.constructor, Calculator.add, Calculator.multiply, Calculator.getValue, compute, processData
+	if len(symbols) == 0 {
+		t.Error("Expected to find symbols in TypeScript file")
+	}
+
+	// Count functions, methods, and classes
+	var functionCount, methodCount, classCount int
+	for _, sym := range symbols {
+		if sym.Lang != LangTS {
+			t.Errorf("Expected language %s, got %s for symbol %s", LangTS, sym.Lang, sym.Name)
+		}
+		switch sym.Kind {
+		case "function":
+			functionCount++
+		case "method":
+			methodCount++
+		case "class":
+			classCount++
+		default:
+			t.Errorf("Unexpected kind %s for symbol %s", sym.Kind, sym.Name)
+		}
+	}
+
+	// We should have functions (simpleFunction, add, greet, compute, processData)
+	if functionCount == 0 {
+		t.Error("Expected to find at least one function")
+	}
+	// We should have methods (constructor, add, multiply, getValue)
+	if methodCount == 0 {
+		t.Error("Expected to find at least one method")
+	}
+	// We should have classes (Calculator)
+	if classCount == 0 {
+		t.Error("Expected to find at least one class")
+	}
+
+	// Test specific function: add
+	var addFunc *Symbol
+	for i := range symbols {
+		if symbols[i].Name == "add" && symbols[i].Kind == "function" {
+			addFunc = &symbols[i]
+			break
+		}
+	}
+
+	if addFunc == nil {
+		t.Fatal("Expected to find 'add' function")
+	}
+
+	// Check add function details
+	if addFunc.QualifiedName != "add" {
+		t.Errorf("Expected qualified name 'add', got %s", addFunc.QualifiedName)
+	}
+
+	if len(addFunc.Params) != 2 {
+		t.Errorf("Expected 2 parameters for add, got %d", len(addFunc.Params))
+	}
+
+	// Check ID format
+	expectedIDPrefix := "ts:" + testFile
+	if len(addFunc.ID) < len(expectedIDPrefix) || addFunc.ID[:len(expectedIDPrefix)] != expectedIDPrefix {
+		t.Errorf("Expected ID to start with %s, got %s", expectedIDPrefix, addFunc.ID)
+	}
+
+	// Test method: Calculator.add
+	var calcAddMethod *Symbol
+	for i := range symbols {
+		if symbols[i].Name == "add" && symbols[i].Kind == "method" {
+			calcAddMethod = &symbols[i]
+			break
+		}
+	}
+
+	if calcAddMethod == nil {
+		t.Fatal("Expected to find Calculator.add method")
+	}
+
+	// Check qualified name for method
+	if calcAddMethod.QualifiedName != "Calculator.add" {
+		t.Errorf("Expected qualified name 'Calculator.add', got %s", calcAddMethod.QualifiedName)
+	}
+
+	// Check metadata for class name
+	if calcAddMethod.Metadata == nil {
+		t.Error("Expected metadata for method")
+	} else {
+		if _, ok := calcAddMethod.Metadata["class_name"]; !ok {
+			t.Error("Expected class_name in metadata")
+		}
+	}
+
+	// Test class: Calculator
+	var calcClass *Symbol
+	for i := range symbols {
+		if symbols[i].Name == "Calculator" && symbols[i].Kind == "class" {
+			calcClass = &symbols[i]
+			break
+		}
+	}
+
+	if calcClass == nil {
+		t.Fatal("Expected to find Calculator class")
+	}
+
+	// Check class details
+	if calcClass.QualifiedName != "Calculator" {
+		t.Errorf("Expected qualified name 'Calculator', got %s", calcClass.QualifiedName)
+	}
+
+	// Test function with calls: compute
+	var computeFunc *Symbol
+	for i := range symbols {
+		if symbols[i].Name == "compute" {
+			computeFunc = &symbols[i]
+			break
+		}
+	}
+
+	if computeFunc == nil {
+		t.Fatal("Expected to find 'compute' function")
+	}
+
+	// Check that compute has callees
+	if len(computeFunc.Callees) == 0 {
+		t.Error("Expected compute to have callees")
+	}
+
+	// Check for specific callees
+	foundAdd := false
+	foundSimple := false
+	for _, callee := range computeFunc.Callees {
+		if callee.Name == "add" {
+			foundAdd = true
+		}
+		if callee.Name == "simpleFunction" {
+			foundSimple = true
+		}
+	}
+
+	if !foundAdd {
+		t.Error("Expected compute to call 'add'")
+	}
+	if !foundSimple {
+		t.Error("Expected compute to call 'simpleFunction'")
+	}
+}
+
 func TestDetectLanguage(t *testing.T) {
 	tests := []struct {
 		filepath string
@@ -240,8 +709,12 @@ func TestDetectLanguage(t *testing.T) {
 		{"test.h", LangC, false},
 		{"test.GO", LangGo, false}, // Case insensitive
 		{"test.C", LangC, false},
+		{"test.cpp", LangCpp, false},
+		{"test.cc", LangCpp, false},
+		{"test.hpp", LangCpp, false},
+		{"test.py", LangPy, false},
+		{"test.ts", LangTS, false},
 		{"test.txt", "", true}, // Unsupported
-		{"test.py", "", true},  // Not yet supported
 	}
 
 	for _, tt := range tests {
