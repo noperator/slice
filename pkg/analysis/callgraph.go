@@ -1,4 +1,4 @@
-package codeql
+package analysis
 
 import (
 	"fmt"
@@ -11,11 +11,11 @@ import (
 
 // CallGraph represents function call relationships using a graph library
 type CallGraph struct {
-	g            graph.Graph[string, string] // Directed graph of function IDs
-	functions    map[string][]string        // Map function name -> list of function IDs
-	edges        map[string][]string        // Legacy field for backward compatibility
-	reverseEdges map[string][]string        // Legacy field for backward compatibility
-	pathCache    sync.Map                   // Cache for path lookups (thread-safe)
+	g         graph.Graph[string, string]  // Directed graph of function IDs
+	symbols   map[string]*parser.Symbol    // Map ID -> Symbol for looking up symbol data
+	functions map[string][]string          // Map function name -> list of function IDs
+	byLang    map[string][]string          // Map language -> list of function IDs
+	pathCache sync.Map                     // Cache for path lookups (thread-safe)
 }
 
 // ReachabilityAnalysis contains the results of analyzing reachability between two functions
@@ -30,40 +30,58 @@ type ReachabilityAnalysis struct {
 	MaxDepth      int        `json:"max_depth,omitempty"`
 }
 
-// BuildCallGraph creates a call graph from parsed functions
-func BuildCallGraph(functions []parser.Function) *CallGraph {
+// BuildCallGraph creates a call graph from parsed symbols (functions, methods, etc.)
+func BuildCallGraph(symbols []parser.Symbol) *CallGraph {
 	// Create directed graph with string hash
 	g := graph.New(graph.StringHash, graph.Directed())
-	
+
 	cg := &CallGraph{
-		g:            g,
-		functions:    make(map[string][]string),
-		edges:        make(map[string][]string),
-		reverseEdges: make(map[string][]string),
+		g:         g,
+		symbols:   make(map[string]*parser.Symbol),
+		functions: make(map[string][]string),
+		byLang:    make(map[string][]string),
 	}
 
-	// Add all functions as vertices
-	for _, function := range functions {
-		_ = g.AddVertex(function.ID)
-		cg.functions[function.Name] = append(cg.functions[function.Name], function.ID)
+	// Add all symbols as vertices and index by language
+	for i := range symbols {
+		symbol := &symbols[i]
+		_ = g.AddVertex(symbol.ID)
+		cg.symbols[symbol.ID] = symbol
+		cg.functions[symbol.Name] = append(cg.functions[symbol.Name], symbol.ID)
+		cg.byLang[symbol.Lang] = append(cg.byLang[symbol.Lang], symbol.ID)
 	}
 
-	// Add edges for function calls
-	for _, caller := range functions {
+	// Add edges for function calls with language-scoped resolution
+	for _, caller := range symbols {
 		for _, callee := range caller.Callees {
-			// Find all functions with this callee name
-			if calleeIDs, exists := cg.functions[callee.Name]; exists {
-				for _, calleeID := range calleeIDs {
-					_ = g.AddEdge(caller.ID, calleeID)
-					// Also populate legacy edge maps for backward compatibility
-					cg.edges[caller.ID] = append(cg.edges[caller.ID], calleeID)
-					cg.reverseEdges[calleeID] = append(cg.reverseEdges[calleeID], caller.ID)
-				}
+			// Only find callees in the same language as caller
+			calleeIDs := cg.findInLanguage(callee.Name, caller.Lang)
+
+			// Add edges to all matching callees (same language only)
+			for _, calleeID := range calleeIDs {
+				_ = g.AddEdge(caller.ID, calleeID)
 			}
 		}
 	}
 
 	return cg
+}
+
+// findInLanguage finds all function IDs with the given name in the specified language
+func (cg *CallGraph) findInLanguage(name, lang string) []string {
+	var result []string
+
+	// Get all IDs for functions with this name
+	candidateIDs := cg.functions[name]
+
+	// Filter to only those in the specified language by checking the symbol's Lang field
+	for _, id := range candidateIDs {
+		if symbol := cg.symbols[id]; symbol != nil && symbol.Lang == lang {
+			result = append(result, id)
+		}
+	}
+
+	return result
 }
 
 // AnalyzeReachability analyzes the reachability relationship between two functions
@@ -120,7 +138,7 @@ type reachabilityAnalyzer struct {
 	maxDepth       int
 	sourceFuncName string
 	targetFuncName string
-	
+
 	// Results
 	foundRelationship bool
 	relationshipType  RelationshipType
@@ -168,7 +186,7 @@ func (ra *reachabilityAnalyzer) analyzePair(sourceID, targetID string) {
 	if callers := ra.findCommonAncestors(sourceID, targetID); len(callers) > 0 {
 		ra.foundRelationship = true
 		ra.relationshipType = CommonAncestor
-		
+
 		// Add sample paths from first common caller
 		if len(callers) > 0 {
 			firstCaller := callers[0]
@@ -177,7 +195,7 @@ func (ra *reachabilityAnalyzer) analyzePair(sourceID, targetID string) {
 			ra.addPaths(paths1)
 			ra.addPaths(paths2)
 		}
-		
+
 		// Store common callers
 		if ra.commonCallers == nil {
 			ra.commonCallers = make(map[string]bool)
@@ -200,19 +218,19 @@ func (ra *reachabilityAnalyzer) findPaths(from, to string) [][]string {
 	if err != nil || shortestPath == nil {
 		return nil
 	}
-	
+
 	// If shortest path exceeds depth, no valid paths exist
 	if len(shortestPath)-1 > searchDepth {
 		return nil
 	}
-	
+
 	// For performance, just return the shortest path converted to names
 	// This is much faster than AllPathsBetween for large graphs
 	var names []string
 	for _, id := range shortestPath {
 		names = append(names, extractFunctionName(id))
 	}
-	
+
 	return [][]string{names}
 }
 
@@ -271,7 +289,7 @@ func (ra *reachabilityAnalyzer) buildResult() *ReachabilityAnalysis {
 				callerName = name
 				break
 			}
-			details = fmt.Sprintf("Common caller: %s calls both %s and %s", 
+			details = fmt.Sprintf("Common caller: %s calls both %s and %s",
 				callerName, ra.sourceFuncName, ra.targetFuncName)
 		} else {
 			details = fmt.Sprintf("Found %d common callers that reach both functions", callerCount)
@@ -307,10 +325,10 @@ func (ra *reachabilityAnalyzer) buildResult() *ReachabilityAnalysis {
 // Helper functions
 
 func extractFunctionName(funcID string) string {
-	// Function ID format: file:line:function_name
+	// Function ID format: lang:file:line:function_name
 	parts := strings.Split(funcID, ":")
-	if len(parts) >= 3 {
-		return parts[2]
+	if len(parts) >= 4 {
+		return parts[3]
 	}
 	return funcID
 }
@@ -319,10 +337,10 @@ func calculatePathDepths(paths [][]string) (min, max int) {
 	if len(paths) == 0 {
 		return 0, 0
 	}
-	
+
 	min = len(paths[0]) - 1
 	max = min
-	
+
 	for _, path := range paths[1:] {
 		depth := len(path) - 1
 		if depth < min {
@@ -332,7 +350,7 @@ func calculatePathDepths(paths [][]string) (min, max int) {
 			max = depth
 		}
 	}
-	
+
 	// Handle paths that represent common ancestors (two separate paths)
 	// In this case, we want the sum of depths
 	if len(paths) >= 2 {
@@ -350,14 +368,14 @@ func calculatePathDepths(paths [][]string) (min, max int) {
 			}
 		}
 	}
-	
+
 	return min, max
 }
 
 func deduplicatePaths(paths [][]string) [][]string {
 	seen := make(map[string]bool)
 	var result [][]string
-	
+
 	for _, path := range paths {
 		key := strings.Join(path, "->")
 		if !seen[key] {
@@ -365,7 +383,7 @@ func deduplicatePaths(paths [][]string) [][]string {
 			result = append(result, path)
 		}
 	}
-	
+
 	return result
 }
 
@@ -373,7 +391,7 @@ func deduplicatePaths(paths [][]string) [][]string {
 // This wraps the new generic AnalyzeReachability function
 func (cg *CallGraph) ValidateCallRelationship(freeFuncName, useFuncName string, maxDepth int) *CallValidation {
 	analysis := cg.AnalyzeReachability(freeFuncName, useFuncName, maxDepth)
-	
+
 	// Convert to old struct type (CallValidation is just an alias)
 	return (*CallValidation)(analysis)
 }
@@ -388,13 +406,13 @@ func (cg *CallGraph) HasPath(from, to string, maxDepth int) bool {
 	if from == to {
 		return true
 	}
-	
+
 	// Use graph library to check if path exists
 	path, err := graph.ShortestPath(cg.g, from, to)
 	if err != nil || path == nil {
 		return false
 	}
-	
+
 	// Check if path length is within maxDepth
 	return len(path)-1 <= maxDepth
 }
@@ -410,12 +428,12 @@ func (cg *CallGraph) FindCallChains(from, to string, maxDepth int) [][]string {
 	if err != nil || shortestPath == nil {
 		return nil
 	}
-	
+
 	// Check depth
 	if len(shortestPath) > maxDepth {
 		return nil
 	}
-	
+
 	return [][]string{shortestPath}
 }
 
@@ -446,23 +464,23 @@ func (cg *CallGraph) haveCommonCaller(func1, func2 string, maxDepth int) bool {
 	if err != nil {
 		return false
 	}
-	
+
 	// Check each vertex to see if it can reach both functions
 	for vertex := range adjMap {
 		// Skip if this is one of our target functions
 		if vertex == func1 || vertex == func2 {
 			continue
 		}
-		
+
 		// Check reachability to both functions
 		canReachFunc1 := cg.HasPath(vertex, func1, searchDepth)
 		canReachFunc2 := cg.HasPath(vertex, func2, searchDepth)
-		
+
 		if canReachFunc1 && canReachFunc2 {
 			return true
 		}
 	}
-	
+
 	return false
 }
 

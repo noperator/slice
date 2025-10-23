@@ -2,22 +2,24 @@ package llm
 
 import (
 	"encoding/json"
-	"github.com/noperator/slice/pkg/codeql"
 	"strings"
+
+	"github.com/noperator/slice/pkg/analysis"
+	"github.com/noperator/slice/pkg/codeql"
 )
 
 
 // CodeQLRequest contains the data needed for LLM processing of CodeQL findings
 type CodeQLRequest struct {
-	CodeQLResult         codeql.CodeQLResult    `json:"codeql_result"`
-	SourceCode           codeql.SourceCode      `json:"source_code"`
-	CallValidation       *codeql.CallValidation `json:"call_validation,omitempty"`
-	FreeFuncDef          string                 `json:"free_function_definition"`
-	UseFuncDef           string                 `json:"use_function_definition"`
-	IntermediateFuncDefs []string               `json:"intermediate_function_definitions"`
-	CallChains           [][]string             `json:"chains"`
-	FreeSnippet          string                 `json:"free_snippet"`
-	UseSnippet           string                 `json:"use_snippet"`
+	CodeQLResult         codeql.CodeQLResult           `json:"codeql_result"`
+	SourceCode           codeql.SourceCode             `json:"source_code"`
+	CallValidation       *analysis.CallValidation      `json:"call_validation,omitempty"`
+	FreeFuncDef          string                        `json:"free_function_definition"`
+	UseFuncDef           string                        `json:"use_function_definition"`
+	IntermediateFuncDefs []string                      `json:"intermediate_function_definitions"`
+	CallChains           [][]string                    `json:"chains"`
+	FreeSnippet          string                        `json:"free_snippet"`
+	UseSnippet           string                        `json:"use_snippet"`
 }
 
 // UnifiedResult represents a finding that can be progressively enriched
@@ -27,7 +29,7 @@ type UnifiedResult struct {
 	SourceCode   codeql.SourceCode   `json:"source"`
 
 	// Optional call validation results (present when --validate-calls is enabled)
-	CallValidation *codeql.CallValidation `json:"calls,omitempty"`
+	CallValidation *analysis.CallValidation `json:"calls,omitempty"`
 
 
 	// Optional ranking results (present after rank command)

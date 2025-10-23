@@ -1,5 +1,7 @@
 package codeql
 
+import "github.com/noperator/slice/pkg/analysis"
+
 type CodeQLResult struct {
 	ObjName               string `json:"object"`
 	FreeFunctionName      string `json:"free_func"`
@@ -24,8 +26,8 @@ type SourceCode struct {
 }
 
 type Finding struct {
-	CodeQLResult   CodeQLResult    `json:"codeql_result"`
-	SourceCode     SourceCode      `json:"source_code"`
-	CallValidation *CallValidation `json:"call_validation,omitempty"`
+	CodeQLResult   CodeQLResult              `json:"codeql_result"`
+	SourceCode     SourceCode                `json:"source_code"`
+	CallValidation *analysis.CallValidation  `json:"call_validation,omitempty"`
 }
 

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/spf13/cobra"
+	"github.com/noperator/slice/pkg/analysis"
 	"github.com/noperator/slice/pkg/codeql"
 	"github.com/noperator/slice/pkg/llm"
 	"github.com/noperator/slice/pkg/logging"
@@ -70,7 +71,7 @@ TreeSitter parsing infrastructure to provide comprehensive vulnerability reports
 			"results_found", len(codeqlResults),
 			"source_directory", sourceDir)
 
-		var callGraph *codeql.CallGraph
+		var callGraph *analysis.CallGraph
 		validateCalls := !noValidate
 		if validateCalls {
 			queryLogger.Info("building call graph for validation",
@@ -80,10 +81,10 @@ TreeSitter parsing infrastructure to provide comprehensive vulnerability reports
 			if err != nil {
 				return fmt.Errorf("failed to parse source code for call graph: %w", err)
 			}
-			callGraph = codeql.BuildCallGraph(analysisResult.Functions)
+			callGraph = analysis.BuildCallGraph(analysisResult.Symbols)
 			queryLogger.Info("call graph built",
 				"component", "codeql",
-				"functions", len(analysisResult.Functions))
+				"symbols", len(analysisResult.Symbols))
 		}
 
 		enricher := codeql.NewQueryEnricher(sourceDir)

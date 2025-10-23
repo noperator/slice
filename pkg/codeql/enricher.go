@@ -11,6 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/noperator/slice/pkg/analysis"
 	"github.com/noperator/slice/pkg/logging"
 	"github.com/noperator/slice/pkg/parser"
 )
@@ -30,7 +31,7 @@ func NewQueryEnricher(sourceDir string) *QueryEnricher {
 }
 
 // EnrichResults enriches CodeQL results with source code and validation using parallel processing
-func (e *QueryEnricher) EnrichResults(results []CodeQLResult, callGraph *CallGraph, validateCalls bool, callDepth int, concurrency int) ([]Finding, error) {
+func (e *QueryEnricher) EnrichResults(results []CodeQLResult, callGraph *analysis.CallGraph, validateCalls bool, callDepth int, concurrency int) ([]Finding, error) {
 	// Use atomic counters for thread-safe statistics
 	var validationStats struct {
 		total   atomic.Int32
@@ -319,7 +320,7 @@ func (e *QueryEnricher) findFunctionByName(funcName string) (FunctionCode, error
 	}
 	
 	// Search for the function by name
-	for _, function := range analysisResult.Functions {
+	for _, function := range analysisResult.Symbols {
 		if function.Name == funcName {
 			// Found the function, now get its full definition
 			funcID := function.ID
