@@ -127,3 +127,28 @@ func FindFunctionByID(directory, functionID string) (*Symbol, error) {
 
 	return nil, fmt.Errorf("function not found: %s", functionID)
 }
+
+// FindSymbolByLocation finds a symbol by its location (file, line, name)
+// This is the preferred method for lookups when you have structured data,
+// as it doesn't require knowing the language or constructing an ID string.
+func FindSymbolByLocation(directory, filename string, startLine int, name string) (*Symbol, error) {
+	result, err := GetCachedAnalysisResult(directory)
+	if err != nil {
+		return nil, err
+	}
+
+	// Construct full file path for comparison
+	fullPath := filepath.Join(directory, filename)
+
+	// Search for symbol matching: name, file, and start line
+	for i := range result.Symbols {
+		sym := &result.Symbols[i]
+		if sym.Name == name &&
+		   sym.Filename == fullPath &&
+		   sym.StartLine == startLine {
+			return sym, nil
+		}
+	}
+
+	return nil, fmt.Errorf("symbol not found: %s at %s:%d", name, filename, startLine)
+}

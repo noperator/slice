@@ -219,19 +219,17 @@ func (e *QueryEnricher) EnrichResults(results []CodeQLResult, callGraph *analysi
 
 // enrichWithSourceCode enriches a CodeQL result with source code context
 func (e *QueryEnricher) enrichWithSourceCode(result CodeQLResult) (Finding, error) {
-	// Create function IDs for free and use functions with full paths
-	freeID := fmt.Sprintf("%s:%d:%s", filepath.Join(e.sourceDir, result.FreeFunctionFile), result.FreeFunctionDefLine, result.FreeFunctionName)
-	useID := fmt.Sprintf("%s:%d:%s", filepath.Join(e.sourceDir, result.UseFunctionFile), result.UseFunctionDefLine, result.UseFunctionName)
-	
-	// Find functions using parser
-	freeFunc, err := parser.FindFunctionByID(e.sourceDir, freeID)
+	// Find functions using structured lookup (name, file, line)
+	freeFunc, err := parser.FindSymbolByLocation(e.sourceDir, result.FreeFunctionFile, result.FreeFunctionDefLine, result.FreeFunctionName)
 	if err != nil {
-		return Finding{}, fmt.Errorf("failed to find free function %s: %w", freeID, err)
+		return Finding{}, fmt.Errorf("failed to find free function %s at %s:%d: %w",
+			result.FreeFunctionName, result.FreeFunctionFile, result.FreeFunctionDefLine, err)
 	}
-	
-	useFunc, err := parser.FindFunctionByID(e.sourceDir, useID)
+
+	useFunc, err := parser.FindSymbolByLocation(e.sourceDir, result.UseFunctionFile, result.UseFunctionDefLine, result.UseFunctionName)
 	if err != nil {
-		return Finding{}, fmt.Errorf("failed to find use function %s: %w", useID, err)
+		return Finding{}, fmt.Errorf("failed to find use function %s at %s:%d: %w",
+			result.UseFunctionName, result.UseFunctionFile, result.UseFunctionDefLine, err)
 	}
 	
 	// Get specific line snippets
@@ -322,19 +320,9 @@ func (e *QueryEnricher) findFunctionByName(funcName string) (FunctionCode, error
 	// Search for the function by name
 	for _, function := range analysisResult.Symbols {
 		if function.Name == funcName {
-			// Found the function, now get its full definition
-			funcID := function.ID
-			fullFunc, err := parser.FindFunctionByID(e.sourceDir, funcID)
-			if err != nil {
-				// Try to return what we have
-				return FunctionCode{
-					DefinitionWithLineNumbers: function.DefinitionWithLineNumbers,
-					Snippet:                  "",
-				}, nil
-			}
-			
+			// Found the function - use it directly (no need to look up by ID)
 			return FunctionCode{
-				DefinitionWithLineNumbers: fullFunc.DefinitionWithLineNumbers,
+				DefinitionWithLineNumbers: function.DefinitionWithLineNumbers,
 				Snippet:                  "", // We don't have a specific line for intermediate functions
 			}, nil
 		}
