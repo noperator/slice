@@ -20,6 +20,9 @@ public:
     // Constructor
     Calculator() : value(0) {}
 
+    // Destructor
+    ~Calculator() {}
+
     // Method with parameter
     void add(int x) {
         value += x;
@@ -34,6 +37,15 @@ public:
     // Getter method
     int getValue() const {
         return value;
+    }
+
+    // Operator overloads
+    bool operator==(const Calculator &other) const {
+        return value == other.value;
+    }
+
+    bool operator<(const Calculator &other) const {
+        return value < other.value;
     }
 };
 
@@ -52,4 +64,27 @@ int main() {
     int result = compute(5, 10);
     std::cout << "Result: " << result << std::endl;
     return 0;
+}
+
+// Test class with methods defined outside
+class ExternalMethods {
+public:
+    void externalMethod(int x);
+    ~ExternalMethods();
+    bool operator!=(const ExternalMethods &other) const;
+};
+
+// Method defined outside class body
+void ExternalMethods::externalMethod(int x) {
+    std::cout << "External: " << x << std::endl;
+}
+
+// Destructor defined outside class body
+ExternalMethods::~ExternalMethods() {
+    // cleanup
+}
+
+// Operator defined outside class body
+bool ExternalMethods::operator!=(const ExternalMethods &other) const {
+    return true;
 }

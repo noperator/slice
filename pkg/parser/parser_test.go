@@ -237,9 +237,10 @@ func TestParseCppFile(t *testing.T) {
 		t.Fatalf("Failed to parse C++ file: %v", err)
 	}
 
-	// Expected symbols: simpleFunction, add, Calculator (class), Calculator::add (method),
-	// Calculator::multiply (method), Calculator::getValue (method), compute, main
-	// Plus Calculator constructor
+	// Expected symbols: simpleFunction, add, Calculator (class),
+	// Calculator methods: constructor, destructor, add, multiply, getValue, operator==, operator<
+	// ExternalMethods (class) and its methods defined outside: externalMethod, destructor, operator!=
+	// compute, main
 	if len(symbols) == 0 {
 		t.Error("Expected to find symbols in C++ file")
 	}
@@ -383,6 +384,112 @@ func TestParseCppFile(t *testing.T) {
 	}
 	if !foundSimple {
 		t.Error("Expected compute to call 'simpleFunction'")
+	}
+
+	// Test destructor: Calculator::~Calculator
+	var destructor *Symbol
+	for i := range symbols {
+		if symbols[i].Name == "~Calculator" && symbols[i].Kind == "method" {
+			destructor = &symbols[i]
+			break
+		}
+	}
+
+	if destructor == nil {
+		t.Error("Expected to find Calculator destructor")
+	} else {
+		if destructor.QualifiedName != "Calculator::~Calculator" {
+			t.Errorf("Expected qualified name 'Calculator::~Calculator', got %s", destructor.QualifiedName)
+		}
+		if destructor.ID == "" {
+			t.Error("Expected destructor to have an ID")
+		}
+	}
+
+	// Test operator overload: Calculator::operator==
+	var operatorEq *Symbol
+	for i := range symbols {
+		if symbols[i].Name == "operator==" && symbols[i].Kind == "method" {
+			operatorEq = &symbols[i]
+			break
+		}
+	}
+
+	if operatorEq == nil {
+		t.Error("Expected to find Calculator::operator==")
+	} else {
+		if operatorEq.QualifiedName != "Calculator::operator==" {
+			t.Errorf("Expected qualified name 'Calculator::operator==', got %s", operatorEq.QualifiedName)
+		}
+		if operatorEq.ID == "" {
+			t.Error("Expected operator== to have an ID")
+		}
+		if len(operatorEq.Params) != 1 {
+			t.Errorf("Expected operator== to have 1 parameter, got %d", len(operatorEq.Params))
+		}
+	}
+
+	// Test method defined outside class: ExternalMethods::externalMethod
+	var externalMethod *Symbol
+	for i := range symbols {
+		if symbols[i].Name == "externalMethod" && symbols[i].Kind == "method" {
+			externalMethod = &symbols[i]
+			break
+		}
+	}
+
+	if externalMethod == nil {
+		t.Error("Expected to find ExternalMethods::externalMethod")
+	} else {
+		if externalMethod.QualifiedName != "ExternalMethods::externalMethod" {
+			t.Errorf("Expected qualified name 'ExternalMethods::externalMethod', got %s", externalMethod.QualifiedName)
+		}
+		if externalMethod.ID == "" {
+			t.Error("Expected externalMethod to have an ID")
+		}
+		if externalMethod.Metadata == nil || externalMethod.Metadata["class_name"] != "ExternalMethods" {
+			t.Error("Expected externalMethod to have class_name metadata set to 'ExternalMethods'")
+		}
+	}
+
+	// Test destructor defined outside class: ExternalMethods::~ExternalMethods
+	var externalDestructor *Symbol
+	for i := range symbols {
+		if symbols[i].Name == "~ExternalMethods" && symbols[i].Kind == "method" {
+			externalDestructor = &symbols[i]
+			break
+		}
+	}
+
+	if externalDestructor == nil {
+		t.Error("Expected to find ExternalMethods destructor defined outside class")
+	} else {
+		if externalDestructor.QualifiedName != "ExternalMethods::~ExternalMethods" {
+			t.Errorf("Expected qualified name 'ExternalMethods::~ExternalMethods', got %s", externalDestructor.QualifiedName)
+		}
+		if externalDestructor.ID == "" {
+			t.Error("Expected external destructor to have an ID")
+		}
+	}
+
+	// Test operator defined outside class: ExternalMethods::operator!=
+	var externalOperator *Symbol
+	for i := range symbols {
+		if symbols[i].Name == "operator!=" && symbols[i].Kind == "method" {
+			externalOperator = &symbols[i]
+			break
+		}
+	}
+
+	if externalOperator == nil {
+		t.Error("Expected to find ExternalMethods::operator!= defined outside class")
+	} else {
+		if externalOperator.QualifiedName != "ExternalMethods::operator!=" {
+			t.Errorf("Expected qualified name 'ExternalMethods::operator!=', got %s", externalOperator.QualifiedName)
+		}
+		if externalOperator.ID == "" {
+			t.Error("Expected external operator!= to have an ID")
+		}
 	}
 }
 

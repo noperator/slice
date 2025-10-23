@@ -129,39 +129,81 @@ func analyzeCppFunction(node *sitter.Node, content []byte, filename string) *Sym
 		return nil
 	}
 
-	// Get function name
-	identifier := findCppFunctionIdentifier(declarator, content)
-	if identifier != "" {
-		functionName := identifier
-		symbol.Name = functionName
-		symbol.QualifiedName = functionName // C++ doesn't need namespace tracking for now
+	// Check if this is a method defined outside a class (has qualified_identifier)
+	qualifiedID := findChildByType(declarator, "qualified_identifier")
+	if qualifiedID != nil {
+		// This is a method defined outside the class body
+		className, methodName := extractQualifiedIdentifierParts(qualifiedID, content)
 
-		// Generate function ID with language prefix
-		symbol.ID = GenerateSymbolID(LangCpp, filename, symbol.StartLine, functionName)
+		if methodName != "" {
+			symbol.Kind = "method"
+			symbol.Name = methodName
+			symbol.QualifiedName = className + "::" + methodName
+			symbol.Metadata = make(map[string]interface{})
+			symbol.Metadata["class_name"] = className
 
-		// Build signature - get return type
-		returnType := ""
-		for i := uint(0); i < node.ChildCount(); i++ {
-			child := node.Child(i)
-			if child.Kind() != "function_declarator" && child.Kind() != "compound_statement" {
-				returnType += getNodeText(child, content) + " "
-			} else if child.Kind() == "function_declarator" {
-				break
+			// Generate method ID with language prefix
+			symbol.ID = GenerateSymbolID(LangCpp, filename, symbol.StartLine, symbol.QualifiedName)
+
+			// Build signature - get return type
+			returnType := ""
+			for i := uint(0); i < node.ChildCount(); i++ {
+				child := node.Child(i)
+				if child.Kind() != "function_declarator" && child.Kind() != "compound_statement" {
+					returnType += getNodeText(child, content) + " "
+				} else if child.Kind() == "function_declarator" {
+					break
+				}
 			}
-		}
 
-		// Get parameters
-		paramList := findChildByType(declarator, "parameter_list")
-		if paramList != nil {
-			symbol.Params = extractCppParameters(paramList, content)
-		}
+			// Get parameters
+			paramList := findChildByType(declarator, "parameter_list")
+			if paramList != nil {
+				symbol.Params = extractCppParameters(paramList, content)
+			}
 
-		// Build full signature
-		var paramStrings []string
-		for _, param := range symbol.Params {
-			paramStrings = append(paramStrings, param.Snippet)
+			// Build full signature
+			var paramStrings []string
+			for _, param := range symbol.Params {
+				paramStrings = append(paramStrings, param.Snippet)
+			}
+			symbol.Signature = strings.TrimSpace(returnType) + " " + symbol.QualifiedName + "(" + strings.Join(paramStrings, ", ") + ")"
 		}
-		symbol.Signature = strings.TrimSpace(returnType) + " " + functionName + "(" + strings.Join(paramStrings, ", ") + ")"
+	} else {
+		// Regular function (not a method)
+		identifier := findCppFunctionIdentifier(declarator, content)
+		if identifier != "" {
+			functionName := identifier
+			symbol.Name = functionName
+			symbol.QualifiedName = functionName
+
+			// Generate function ID with language prefix
+			symbol.ID = GenerateSymbolID(LangCpp, filename, symbol.StartLine, functionName)
+
+			// Build signature - get return type
+			returnType := ""
+			for i := uint(0); i < node.ChildCount(); i++ {
+				child := node.Child(i)
+				if child.Kind() != "function_declarator" && child.Kind() != "compound_statement" {
+					returnType += getNodeText(child, content) + " "
+				} else if child.Kind() == "function_declarator" {
+					break
+				}
+			}
+
+			// Get parameters
+			paramList := findChildByType(declarator, "parameter_list")
+			if paramList != nil {
+				symbol.Params = extractCppParameters(paramList, content)
+			}
+
+			// Build full signature
+			var paramStrings []string
+			for _, param := range symbol.Params {
+				paramStrings = append(paramStrings, param.Snippet)
+			}
+			symbol.Signature = strings.TrimSpace(returnType) + " " + functionName + "(" + strings.Join(paramStrings, ", ") + ")"
+		}
 	}
 
 	// Find function body
@@ -310,9 +352,39 @@ func findCppFunctionIdentifier(declarator *sitter.Node, content []byte) string {
 		child := declarator.Child(i)
 		if child.Kind() == "identifier" || child.Kind() == "field_identifier" {
 			return getNodeText(child, content)
+		} else if child.Kind() == "qualified_identifier" {
+			// Handle qualified identifiers like ClassName::methodName
+			// Extract just the method name (the part after ::)
+			qualifiedText := getNodeText(child, content)
+			parts := strings.Split(qualifiedText, "::")
+			if len(parts) > 0 {
+				return parts[len(parts)-1] // Return the last part (method name)
+			}
+		} else if child.Kind() == "destructor_name" {
+			// Handle destructors like ~ClassName()
+			return getNodeText(child, content)
+		} else if child.Kind() == "operator_name" {
+			// Handle operator overloads like operator==, operator!=, etc.
+			return getNodeText(child, content)
 		}
 	}
 	return ""
+}
+
+// extractQualifiedIdentifierParts extracts class name and method name from a qualified_identifier node
+func extractQualifiedIdentifierParts(qualifiedID *sitter.Node, content []byte) (className string, methodName string) {
+	qualifiedText := getNodeText(qualifiedID, content)
+	parts := strings.Split(qualifiedText, "::")
+
+	if len(parts) >= 2 {
+		// Join all parts except the last as class name (handles nested namespaces)
+		className = strings.Join(parts[:len(parts)-1], "::")
+		methodName = parts[len(parts)-1]
+	} else if len(parts) == 1 {
+		methodName = parts[0]
+	}
+
+	return className, methodName
 }
 
 func extractCppParameters(paramList *sitter.Node, content []byte) []Param {
