@@ -1,8 +1,11 @@
 package llm
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"time"
@@ -12,18 +15,18 @@ import (
 
 // Pipeline handles the complete LLM processing pipeline for vulnerability analysis
 type Pipeline struct {
-	analyzer    *Analyzer
-	config      PipelineConfig
-	logger      *slog.Logger
-	outputAll   bool
+	analyzer  *Analyzer
+	config    PipelineConfig
+	logger    *slog.Logger
+	outputAll bool
 }
 
 // PipelineConfig contains configuration for the processing pipeline
 type PipelineConfig struct {
-	Timeout         time.Duration
-	Concurrency     int
-	PromptTemplate  string
-	OutputAll       bool
+	Timeout        time.Duration
+	Concurrency    int
+	PromptTemplate string
+	OutputAll      bool
 }
 
 // NewPipeline creates a new LLM processing pipeline
@@ -49,7 +52,7 @@ func (p *Pipeline) ProcessResults(ctx context.Context, input *UnifiedOutput) (*U
 	}
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	
+
 	outputResults, err := p.processWithTemplate(timeoutCtx, input, metadata)
 	if err != nil {
 		return nil, err
@@ -60,12 +63,12 @@ func (p *Pipeline) ProcessResults(ctx context.Context, input *UnifiedOutput) (*U
 		filteredResults := p.filterResultsByValidity(outputResults.Results, metadata)
 		originalCount := len(outputResults.Results)
 		outputResults.Results = filteredResults
-		
+
 		if originalCount != len(filteredResults) {
 			p.logger.Info("filtered results by validity",
 				"original_count", originalCount,
 				"valid_count", len(filteredResults),
-				"filtered_out", originalCount - len(filteredResults))
+				"filtered_out", originalCount-len(filteredResults))
 		}
 	}
 
@@ -76,14 +79,18 @@ func (p *Pipeline) ProcessResults(ctx context.Context, input *UnifiedOutput) (*U
 }
 
 // ReadInputResults reads unified results from file or stdin
-func (p *Pipeline) ReadInputResults(inputFile string) (*UnifiedOutput, error) {
+func (p *Pipeline) ReadInputResults(inputFile string, jsonlMode bool) (*UnifiedOutput, error) {
 	var inputResults *UnifiedOutput
 	var err error
 
-	if inputFile != "" {
-		inputResults, err = ReadUnifiedResultsFromFile(inputFile)
+	if jsonlMode {
+		inputResults, err = p.readJSONLInput(inputFile)
 	} else {
-		inputResults, err = ReadUnifiedResultsFromStdin()
+		if inputFile != "" {
+			inputResults, err = ReadUnifiedResultsFromFile(inputFile)
+		} else {
+			inputResults, err = ReadUnifiedResultsFromStdin()
+		}
 	}
 
 	if err != nil {
@@ -96,6 +103,59 @@ func (p *Pipeline) ReadInputResults(inputFile string) (*UnifiedOutput, error) {
 	}
 
 	return inputResults, nil
+}
+
+// readJSONLInput reads JSONL format (one JSON object per line)
+func (p *Pipeline) readJSONLInput(inputFile string) (*UnifiedOutput, error) {
+	var reader io.Reader
+	var file *os.File
+	var err error
+
+	if inputFile != "" {
+		file, err = os.Open(inputFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open input file: %w", err)
+		}
+		defer file.Close()
+		reader = file
+	} else {
+		reader = os.Stdin
+	}
+
+	var results []UnifiedResult
+	scanner := bufio.NewScanner(reader)
+
+	// Increase buffer size for large lines
+	const maxCapacity = 1024 * 1024 // 1MB
+	buf := make([]byte, maxCapacity)
+	scanner.Buffer(buf, maxCapacity)
+
+	lineNum := 0
+	for scanner.Scan() {
+		lineNum++
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+
+		var rawData map[string]interface{}
+		if err := json.Unmarshal(line, &rawData); err != nil {
+			return nil, fmt.Errorf("failed to parse JSON on line %d: %w", lineNum, err)
+		}
+
+		// Create UnifiedResult with raw data
+		results = append(results, UnifiedResult{
+			RawData: rawData,
+		})
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading input: %w", err)
+	}
+
+	return &UnifiedOutput{
+		Results: results,
+	}, nil
 }
 
 // WriteOutputResults writes unified results to file or stdout
@@ -138,10 +198,10 @@ func (p *Pipeline) LoadEnvironmentConfig(config *Config) error {
 // filterResultsByValidity filters results based on their valid field
 func (p *Pipeline) filterResultsByValidity(results []UnifiedResult, metadata *TemplateMetadata) []UnifiedResult {
 	var filteredResults []UnifiedResult
-	
+
 	for _, result := range results {
 		var isValid bool
-		
+
 		// Check if result has a "valid" field in dynamic results
 		if dynamicResult, exists := result.GetDynamicResult(metadata.Type); exists {
 			if resultMap, ok := dynamicResult.(map[string]interface{}); ok {
@@ -152,22 +212,21 @@ func (p *Pipeline) filterResultsByValidity(results []UnifiedResult, metadata *Te
 				}
 			}
 		}
-		
+
 		if isValid {
 			filteredResults = append(filteredResults, result)
 		}
 	}
-	
+
 	return filteredResults
 }
-
 
 // getTemplateMetadata gets template metadata or returns defaults
 func (p *Pipeline) getTemplateMetadata() (*TemplateMetadata, error) {
 	if p.config.PromptTemplate == "" {
 		return &TemplateMetadata{Type: "generic"}, nil
 	}
-	
+
 	return ParseTemplateMetadata(p.config.PromptTemplate)
 }
 
@@ -184,9 +243,9 @@ func (p *Pipeline) processWithTemplate(ctx context.Context, input *UnifiedOutput
 }
 
 // processWithWorkerPool processes results using a worker pool
-func (p *Pipeline) processWithWorkerPool(ctx context.Context, input *UnifiedOutput, 
+func (p *Pipeline) processWithWorkerPool(ctx context.Context, input *UnifiedOutput,
 	operationName string, processor ProcessFunc[UnifiedResult, UnifiedResult]) (*UnifiedOutput, error) {
-	
+
 	concurrency := p.config.Concurrency
 	if concurrency <= 0 {
 		concurrency = 1
@@ -217,17 +276,14 @@ func (p *Pipeline) createUnifiedProcessor(metadata *TemplateMetadata) ProcessFun
 			return result, nil
 		}
 
-		// Create unified request
-		request := p.createCodeQLRequest(result)
-
-		// Process using unified analyzer method
-		response, err := p.analyzer.ProcessCodeQLFinding(ctx, request, p.config.PromptTemplate)
+		// Pass the result directly to template - no transformation
+		response, err := p.analyzer.ProcessFinding(ctx, result, p.config.PromptTemplate)
 		if err != nil {
 			p.logger.Warn("failed to process finding",
 				"component", "analyzer",
 				"template_type", metadata.Type,
 				"error", err)
-			
+
 			// Generic fallback for any template type
 			response = map[string]interface{}{
 				"valid": false,
@@ -240,35 +296,6 @@ func (p *Pipeline) createUnifiedProcessor(metadata *TemplateMetadata) ProcessFun
 
 		return result, nil
 	})
-}
-
-// createCodeQLRequest creates a unified request from a unified result
-func (p *Pipeline) createCodeQLRequest(result UnifiedResult) CodeQLRequest {
-	// Use all call chains from validation if available, otherwise create simple chain
-	var callChains [][]string
-	if result.CallValidation != nil && len(result.CallValidation.CallChains) > 0 {
-		callChains = result.CallValidation.CallChains
-	} else {
-		callChains = [][]string{{result.CodeQLResult.FreeFunctionName, result.CodeQLResult.UseFunctionName}}
-	}
-
-	// Extract all unique intermediate function definitions
-	var intermediateFuncDefs []string
-	for _, funcCode := range result.SourceCode.IntermediateFunctions {
-		intermediateFuncDefs = append(intermediateFuncDefs, funcCode.DefinitionWithLineNumbers)
-	}
-
-	return CodeQLRequest{
-		CodeQLResult:         result.CodeQLResult,
-		SourceCode:           result.SourceCode,
-		CallValidation:       result.CallValidation,
-		FreeFuncDef:          result.SourceCode.FreeFunction.DefinitionWithLineNumbers,
-		UseFuncDef:           result.SourceCode.UseFunction.DefinitionWithLineNumbers,
-		IntermediateFuncDefs: intermediateFuncDefs,
-		CallChains:           callChains,
-		FreeSnippet:          result.SourceCode.FreeFunction.Snippet,
-		UseSnippet:           result.SourceCode.UseFunction.Snippet,
-	}
 }
 
 // printSummaryAndStats prints summary and token usage statistics
@@ -296,7 +323,6 @@ func (p *Pipeline) printSummaryAndStats(outputResults *UnifiedOutput, metadata *
 	p.printTokenStats()
 }
 
-
 // printTokenStats prints token usage statistics
 func (p *Pipeline) printTokenStats() {
 	stats := p.analyzer.GetTokenStats()
@@ -319,4 +345,3 @@ func (p *Pipeline) printTokenStats() {
 			"total_tokens", stats.TotalTokens)
 	}
 }
-

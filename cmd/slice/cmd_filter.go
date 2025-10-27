@@ -21,6 +21,7 @@ var (
 	timeout            int
 	concurrency        int
 	outputAll          bool
+	jsonlIn            bool
 )
 
 
@@ -78,7 +79,7 @@ Examples:
 
 		pipeline = llm.NewPipeline(processorConfig, pipelineConfig)
 
-		inputResults, err := pipeline.ReadInputResults(inputFile)
+		inputResults, err := pipeline.ReadInputResults(inputFile, jsonlIn)
 		if err != nil {
 			return err
 		}
@@ -114,6 +115,9 @@ func init() {
 
 	filterCmd.Flags().BoolVarP(&outputAll, "all", "a", false,
 		"Output all results regardless of validity (default: only output valid/vulnerable results)")
+
+	filterCmd.Flags().BoolVar(&jsonlIn, "jsonl-in", false,
+		"Read input as JSONL (one JSON object per line) instead of wrapped JSON with results key")
 
 	rootCmd.AddCommand(filterCmd)
 }

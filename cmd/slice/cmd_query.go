@@ -96,8 +96,8 @@ TreeSitter parsing infrastructure to provide comprehensive vulnerability reports
 		var results []llm.UnifiedResult
 		for _, finding := range findings {
 			unifiedResult := llm.UnifiedResult{
-				CodeQLResult:   finding.CodeQLResult,
-				SourceCode:     finding.SourceCode,
+				CodeQLResult:   &finding.CodeQLResult,
+				SourceCode:     &finding.SourceCode,
 				CallValidation: finding.CallValidation,
 			}
 			results = append(results, unifiedResult)

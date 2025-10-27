@@ -24,16 +24,18 @@ type CodeQLRequest struct {
 
 // UnifiedResult represents a finding that can be progressively enriched
 type UnifiedResult struct {
-	// Base finding from CodeQL (always present)
-	CodeQLResult codeql.CodeQLResult `json:"query"`
-	SourceCode   codeql.SourceCode   `json:"source"`
+	// Base finding from CodeQL (present when from CodeQL query)
+	CodeQLResult *codeql.CodeQLResult `json:"query,omitempty"`
+	SourceCode   *codeql.SourceCode   `json:"source,omitempty"`
 
 	// Optional call validation results (present when --validate-calls is enabled)
 	CallValidation *analysis.CallValidation `json:"calls,omitempty"`
 
-
 	// Optional ranking results (present after rank command)
 	Rank *RankInfo `json:"rank,omitempty"`
+
+	// Raw data for tool-agnostic input (JSONL mode or other tools)
+	RawData map[string]interface{} `json:"raw_data,omitempty"`
 
 	// Dynamic results with custom keys (for template-defined output keys)
 	DynamicResults map[string]interface{} `json:"-"`
@@ -95,10 +97,11 @@ func (ur *UnifiedResult) UnmarshalJSON(data []byte) error {
 
 	// Known field names that should be handled by regular struct unmarshaling
 	knownFields := map[string]bool{
-		"query":   true,
-		"source":  true,
-		"calls":   true,
-		"rank":    true,
+		"query":    true,
+		"source":   true,
+		"calls":    true,
+		"rank":     true,
+		"raw_data": true,
 	}
 
 	// Separate known and dynamic fields

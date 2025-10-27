@@ -19,67 +19,34 @@ type codeQLTemplateData struct {
 	UseFunctionName      string
 	UseFunctionFile      string
 	UseLine              int
-	CallChain            []string     // For backward compatibility
-	CallChains           [][]string   // Multiple call chains
+	CallChain            []string   // For backward compatibility
+	CallChains           [][]string // Multiple call chains
 	FreeSnippet          string
 	UseSnippet           string
 	FreeFunctionDef      string
 	UseFunctionDef       string
 	IntermediateFuncDefs []string
-	SchemaJSON           string       // Pretty-printed JSON schema for insertion into template
+	SchemaJSON           string // Pretty-printed JSON schema for insertion into template
 }
 
-// RenderCodeQLTemplate renders the CodeQL template with the provided data
-func RenderCodeQLTemplate(request CodeQLRequest, customTemplatePath string) (string, error) {
-	var templateContent string
-	
+// RenderTemplate renders a template with any data structure
+// The data is passed directly to the template - no transformation is performed
+func RenderTemplate(data interface{}, customTemplatePath string) (string, error) {
 	if customTemplatePath == "" {
 		return "", fmt.Errorf("template path is required - no default template available")
 	}
-	
+
 	content, err := os.ReadFile(customTemplatePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read template file %s: %w", customTemplatePath, err)
 	}
-	templateContent = string(content)
-
-	metadata, err := ParseTemplateMetadata(customTemplatePath)
-	if err != nil {
-		metadata = &TemplateMetadata{}
-	}
-
-	data := codeQLTemplateData{
-		ObjectName:           request.CodeQLResult.ObjName,
-		FreeFunctionName:     request.CodeQLResult.FreeFunctionName,
-		FreeFunctionFile:     request.CodeQLResult.FreeFunctionFile,
-		FreeLine:             request.CodeQLResult.FreeLine,
-		UseFunctionName:      request.CodeQLResult.UseFunctionName,
-		UseFunctionFile:      request.CodeQLResult.UseFunctionFile,
-		UseLine:              request.CodeQLResult.UseLine,
-		CallChains:           request.CallChains,
-		FreeSnippet:          request.FreeSnippet,
-		UseSnippet:           request.UseSnippet,
-		FreeFunctionDef:      request.FreeFuncDef,
-		UseFunctionDef:       request.UseFuncDef,
-		IntermediateFuncDefs: request.IntermediateFuncDefs,
-	}
-
-	if len(data.CallChains) > 0 {
-		data.CallChain = data.CallChains[0]
-	}
-
-	if metadata.Schema != nil {
-		schemaBytes, err := json.MarshalIndent(convertSchemaToExample(metadata.Schema), "  ", "  ")
-		if err == nil {
-			data.SchemaJSON = string(schemaBytes)
-		}
-	}
+	templateContent := string(content)
 
 	funcMap := template.FuncMap{
 		"add": func(a, b int) int { return a + b },
 	}
 
-	tmpl, err := template.New("codeql_template").Funcs(funcMap).Parse(templateContent)
+	tmpl, err := template.New("template").Funcs(funcMap).Parse(templateContent)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %w", err)
 	}
@@ -98,9 +65,8 @@ type TemplateMetadata struct {
 	Schema      map[string]interface{} `json:"schema"`
 	Timeout     int                    `json:"timeout"`
 	MaxTokens   int                    `json:"max_tokens"`
-	Temperature float32               `json:"temperature"`
+	Temperature float32                `json:"temperature"`
 }
-
 
 // ParseTemplateMetadata parses template metadata into a structured format
 func ParseTemplateMetadata(templatePath string) (*TemplateMetadata, error) {
@@ -129,7 +95,7 @@ func ParseTemplateMetadata(templatePath string) (*TemplateMetadata, error) {
 			if colonIndex := strings.Index(commentContent, ":"); colonIndex > 0 {
 				key := strings.TrimSpace(commentContent[:colonIndex])
 				value := strings.TrimSpace(commentContent[colonIndex+1:])
-				
+
 				switch key {
 				case "type":
 					metadata.Type = value
@@ -190,7 +156,7 @@ func extractSchemaFromComment(lines []string, startIndex int) string {
 
 	for i := startIndex; i < len(lines) && i < startIndex+10; i++ {
 		line := lines[i]
-		
+
 		// Look for schema: marker
 		if strings.Contains(line, "schema:") {
 			// Extract everything after "schema:"
@@ -260,7 +226,7 @@ func parseFloat32(s string) float32 {
 // convertSchemaToExample converts a JSON schema to an example representation
 func convertSchemaToExample(schema map[string]interface{}) interface{} {
 	schemaType, _ := schema["type"].(string)
-	
+
 	switch schemaType {
 	case "object":
 		result := make(map[string]interface{})
@@ -272,13 +238,13 @@ func convertSchemaToExample(schema map[string]interface{}) interface{} {
 			}
 		}
 		return result
-	
+
 	case "array":
 		if items, ok := schema["items"].(map[string]interface{}); ok {
 			return []interface{}{convertSchemaToExample(items)}
 		}
 		return []interface{}{"string"}
-	
+
 	case "string":
 		if enum, ok := schema["enum"].([]interface{}); ok && len(enum) > 0 {
 			// For enums, show all options separated by |
@@ -293,13 +259,13 @@ func convertSchemaToExample(schema map[string]interface{}) interface{} {
 			}
 		}
 		return "string"
-	
+
 	case "number", "integer":
 		return "number"
-	
+
 	case "boolean":
 		return "boolean"
-	
+
 	default:
 		return "unknown"
 	}

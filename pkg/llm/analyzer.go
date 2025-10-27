@@ -149,8 +149,9 @@ func (a *Analyzer) GetTokenStats() TokenStats {
 	return a.tokenStats
 }
 
-// ProcessCodeQLFinding processes a CodeQL finding using the specified template
-func (a *Analyzer) ProcessCodeQLFinding(ctx context.Context, request CodeQLRequest, templatePath string) (interface{}, error) {
+// ProcessFinding processes a finding using the specified template
+// The finding can be any data structure (UnifiedResult, map[string]interface{}, etc.)
+func (a *Analyzer) ProcessFinding(ctx context.Context, finding interface{}, templatePath string) (interface{}, error) {
 	// Parse template metadata
 	metadata, err := ParseTemplateMetadata(templatePath)
 	if err != nil {
@@ -158,7 +159,7 @@ func (a *Analyzer) ProcessCodeQLFinding(ctx context.Context, request CodeQLReque
 	}
 
 	// Render the prompt using the template
-	prompt, err := RenderCodeQLTemplate(request, templatePath)
+	prompt, err := RenderTemplate(finding, templatePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to render prompt: %w", err)
 	}
