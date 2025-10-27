@@ -7,9 +7,9 @@ You are a security expert specializing in quick triage of potential vulnerabilit
 <task>
 I need a quick triage of this potential use-after-free finding. This is NOT a deep security analysis - just a basic code flow check.
 
-The finding shows {{.CodeQLResult.ObjName}} is freed in {{.CodeQLResult.FreeFunctionName}}() at L{{.CodeQLResult.FreeLine}} of {{.CodeQLResult.FreeFunctionFile}} and then potentially used in {{.CodeQLResult.UseFunctionName}}() at L{{.CodeQLResult.UseLine}} of {{.CodeQLResult.UseFunctionFile}}.
+The finding shows {{.Data.CodeQLResult.ObjName}} is freed in {{.Data.CodeQLResult.FreeFunctionName}}() at L{{.Data.CodeQLResult.FreeLine}} of {{.Data.CodeQLResult.FreeFunctionFile}} and then potentially used in {{.Data.CodeQLResult.UseFunctionName}}() at L{{.Data.CodeQLResult.UseLine}} of {{.Data.CodeQLResult.UseFunctionFile}}.
 
-{{if .CallValidation}}{{if .CallValidation.CallChains}}There are {{len .CallValidation.CallChains}} call chain(s) that could connect the free to the use.{{end}}{{end}}
+{{if .Data.CallValidation}}{{if .Data.CallValidation.CallChains}}There are {{len .Data.CallValidation.CallChains}} call chain(s) that could connect the free to the use.{{end}}{{end}}
 
 **TRIAGE QUESTION**: Does the code flow allow for this to be a potential use-after-free?
 
@@ -21,42 +21,46 @@ I only need you to check:
 
 <uaf_finding>
 <overview>
-**Freed Variable**: `{{.CodeQLResult.ObjName}}`
+**Freed Variable**: `{{.Data.CodeQLResult.ObjName}}`
 
 **Free Location**:
-- Function: `{{.CodeQLResult.FreeFunctionName}}`
-- File: {{.CodeQLResult.FreeFunctionFile}}:{{.CodeQLResult.FreeLine}}
-- Code: `{{.SourceCode.FreeFunction.Snippet}}`
+- Function: `{{.Data.CodeQLResult.FreeFunctionName}}`
+- File: {{.Data.CodeQLResult.FreeFunctionFile}}:{{.Data.CodeQLResult.FreeLine}}
+- Code: `{{.Data.SourceCode.FreeFunction.Snippet}}`
 
 **Use Location**:
-- Function: `{{.CodeQLResult.UseFunctionName}}`
-- File: {{.CodeQLResult.UseFunctionFile}}:{{.CodeQLResult.UseLine}}
-- Code: `{{.SourceCode.UseFunction.Snippet}}`
+- Function: `{{.Data.CodeQLResult.UseFunctionName}}`
+- File: {{.Data.CodeQLResult.UseFunctionFile}}:{{.Data.CodeQLResult.UseLine}}
+- Code: `{{.Data.SourceCode.UseFunction.Snippet}}`
 
 **Call Chain(s)**:
-{{if .CallValidation}}{{if .CallValidation.CallChains}}{{range $i, $chain := .CallValidation.CallChains}}{{add $i 1}}. {{range $j, $func := $chain}}{{if $j}} → {{end}}`{{$func}}`{{end}}
+{{if .Data.CallValidation}}{{if .Data.CallValidation.CallChains}}{{range $i, $chain := .Data.CallValidation.CallChains}}{{add $i 1}}. {{range $j, $func := $chain}}{{if $j}} → {{end}}`{{$func}}`{{end}}
 {{end}}{{end}}{{end}}
 </overview>
 
 <functions>
 <free_function_code>
-{{.SourceCode.FreeFunction.DefinitionWithLineNumbers}}
+{{.Data.SourceCode.FreeFunction.DefinitionWithLineNumbers}}
 </free_function_code>
 
-{{range $i, $funcCode := .SourceCode.IntermediateFunctions}}
+{{range $i, $funcCode := .Data.SourceCode.IntermediateFunctions}}
 <intermediate_function_code_{{$i}}>
 {{$funcCode.DefinitionWithLineNumbers}}
 </intermediate_function_code_{{$i}}>
 
 {{end}}
 <use_function_code>
-{{.SourceCode.UseFunction.DefinitionWithLineNumbers}}
+{{.Data.SourceCode.UseFunction.DefinitionWithLineNumbers}}
 </use_function_code>
 </functions>
 </uaf_finding>
 
 <output_format>
-Respond with structured JSON matching the schema.
+Respond with structured JSON matching the schema:
+
+```json
+{{.SchemaJSON}}
+```
 
 Remember: This is just initial triage for code flow, not a security analysis. We're filtering for cases where it's even POSSIBLE there could be a UAF based on basic execution flow.
 </output_format>

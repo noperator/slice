@@ -145,7 +145,7 @@ func (p *Pipeline) readJSONLInput(inputFile string) (*UnifiedOutput, error) {
 
 		// Create UnifiedResult with raw data
 		results = append(results, UnifiedResult{
-			RawData: rawData,
+			Raw: rawData,
 		})
 	}
 

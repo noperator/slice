@@ -29,8 +29,14 @@ type codeQLTemplateData struct {
 	SchemaJSON           string // Pretty-printed JSON schema for insertion into template
 }
 
+// TemplateData wraps any data with SchemaJSON for template rendering
+type TemplateData struct {
+	Data       interface{}
+	SchemaJSON string
+}
+
 // RenderTemplate renders a template with any data structure
-// The data is passed directly to the template - no transformation is performed
+// The data is wrapped so templates access fields via .Data and schema via .SchemaJSON
 func RenderTemplate(data interface{}, customTemplatePath string) (string, error) {
 	if customTemplatePath == "" {
 		return "", fmt.Errorf("template path is required - no default template available")
@@ -42,6 +48,27 @@ func RenderTemplate(data interface{}, customTemplatePath string) (string, error)
 	}
 	templateContent := string(content)
 
+	// Parse metadata to get schema for template rendering
+	metadata, err := ParseTemplateMetadata(customTemplatePath)
+	if err != nil {
+		metadata = &TemplateMetadata{}
+	}
+
+	// Create schema JSON for template display
+	var schemaJSON string
+	if metadata.Schema != nil {
+		schemaBytes, err := json.MarshalIndent(convertSchemaToExample(metadata.Schema), "  ", "  ")
+		if err == nil {
+			schemaJSON = string(schemaBytes)
+		}
+	}
+
+	// Wrap data with schema
+	templateData := TemplateData{
+		Data:       data,
+		SchemaJSON: schemaJSON,
+	}
+
 	funcMap := template.FuncMap{
 		"add": func(a, b int) int { return a + b },
 	}
@@ -52,7 +79,7 @@ func RenderTemplate(data interface{}, customTemplatePath string) (string, error)
 	}
 
 	var result bytes.Buffer
-	if err := tmpl.Execute(&result, data); err != nil {
+	if err := tmpl.Execute(&result, templateData); err != nil {
 		return "", fmt.Errorf("failed to execute template: %w", err)
 	}
 

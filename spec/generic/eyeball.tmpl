@@ -6,18 +6,18 @@ I ran a static analyzer looking for OWASP Top 10 and CWE Top 25 vulnerabilities,
 </context>
 
 <code_details>
-{{if .RawData}}
-{{if .RawData.file}}**File**: {{.RawData.file}}{{end}}
-{{if .RawData.lang}}**Language**: {{.RawData.lang}}{{end}}
-{{if .RawData.kind}}**Code Type**: {{.RawData.kind}}{{end}}
-{{if .RawData.id}}**Identifier**: {{.RawData.id}}{{end}}
+{{if .Data.Raw}}
+{{if .Data.Raw.file}}**File**: {{.Data.Raw.file}}{{end}}
+{{if .Data.Raw.lang}}**Language**: {{.Data.Raw.lang}}{{end}}
+{{if .Data.Raw.kind}}**Code Type**: {{.Data.Raw.kind}}{{end}}
+{{if .Data.Raw.id}}**Identifier**: {{.Data.Raw.id}}{{end}}
 
-**Static Analyzer's Finding**: {{if .RawData.finding}}"{{.RawData.finding}}"{{else}}(no specific finding mentioned){{end}}
+**Static Analyzer's Finding**: {{if .Data.Raw.finding}}"{{.Data.Raw.finding}}"{{else}}(no specific finding mentioned){{end}}
 
-{{if .RawData.def_ln}}
+{{if .Data.Raw.def_ln}}
 **Code Snippet**:
 ```
-{{.RawData.def_ln}}
+{{.Data.Raw.def_ln}}
 ```
 {{end}}
 {{end}}
@@ -74,3 +74,11 @@ For each finding in your response, provide:
 
 Be thorough but focus on **real, likely exploitable vulnerabilities** - not purely theoretical or extremely low-impact issues.
 </task>
+
+<output_format>
+Please respond with structured JSON matching the schema:
+
+```json
+{{.SchemaJSON}}
+```
+</output_format>

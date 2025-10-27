@@ -5,9 +5,9 @@ You are a security expert performing deep vulnerability analysis.
 </persona>
 
 <task>
-I got this report for potential use after free, where {{.CodeQLResult.ObjName}} is freed in {{.CodeQLResult.FreeFunctionName}}() in L{{.CodeQLResult.FreeLine}} of {{.CodeQLResult.FreeFunctionFile}} and then later potentially used in {{.CodeQLResult.UseFunctionName}}() on L{{.CodeQLResult.UseLine}} of {{.CodeQLResult.UseFunctionFile}}.
+I got this report for potential use after free, where {{.Data.CodeQLResult.ObjName}} is freed in {{.Data.CodeQLResult.FreeFunctionName}}() in L{{.Data.CodeQLResult.FreeLine}} of {{.Data.CodeQLResult.FreeFunctionFile}} and then later potentially used in {{.Data.CodeQLResult.UseFunctionName}}() on L{{.Data.CodeQLResult.UseLine}} of {{.Data.CodeQLResult.UseFunctionFile}}.
 
-{{if .CallValidation}}{{if .CallValidation.CallChains}}There are {{len .CallValidation.CallChains}} call chain(s) that could connect the free to the use.{{end}}{{end}}
+{{if .Data.CallValidation}}{{if .Data.CallValidation.CallChains}}There are {{len .Data.CallValidation.CallChains}} call chain(s) that could connect the free to the use.{{end}}{{end}}
 
 Please provide a comprehensive security analysis following these steps:
 1. Determine if this is a VALID use-after-free vulnerability
@@ -29,40 +29,44 @@ Focus on:
 <overview>
 ## Vulnerability Overview
 
-**Object**: `{{.CodeQLResult.ObjName}}`
+**Object**: `{{.Data.CodeQLResult.ObjName}}`
 
 **Free Operation**:
-- Function: `{{.CodeQLResult.FreeFunctionName}}` ({{.CodeQLResult.FreeFunctionFile}}:{{.CodeQLResult.FreeLine}})
-- Code: `{{.SourceCode.FreeFunction.Snippet}}`
+- Function: `{{.Data.CodeQLResult.FreeFunctionName}}` ({{.Data.CodeQLResult.FreeFunctionFile}}:{{.Data.CodeQLResult.FreeLine}})
+- Code: `{{.Data.SourceCode.FreeFunction.Snippet}}`
 
 **Use Operation**:
-- Function: `{{.CodeQLResult.UseFunctionName}}` ({{.CodeQLResult.UseFunctionFile}}:{{.CodeQLResult.UseLine}})
-- Code: `{{.SourceCode.UseFunction.Snippet}}`
+- Function: `{{.Data.CodeQLResult.UseFunctionName}}` ({{.Data.CodeQLResult.UseFunctionFile}}:{{.Data.CodeQLResult.UseLine}})
+- Code: `{{.Data.SourceCode.UseFunction.Snippet}}`
 
 **Execution Path(s)**:
-{{if .CallValidation}}{{if .CallValidation.CallChains}}{{range $i, $chain := .CallValidation.CallChains}}{{add $i 1}}. {{range $j, $func := $chain}}{{if $j}} → {{end}}`{{$func}}`{{end}}
+{{if .Data.CallValidation}}{{if .Data.CallValidation.CallChains}}{{range $i, $chain := .Data.CallValidation.CallChains}}{{add $i 1}}. {{range $j, $func := $chain}}{{if $j}} → {{end}}`{{$func}}`{{end}}
 {{end}}{{end}}{{end}}
 </overview>
 
 <functions>
 <free_func_def_ln>
-{{.SourceCode.FreeFunction.DefinitionWithLineNumbers}}
+{{.Data.SourceCode.FreeFunction.DefinitionWithLineNumbers}}
 </free_func_def_ln>
 
-{{range $i, $funcCode := .SourceCode.IntermediateFunctions}}
+{{range $i, $funcCode := .Data.SourceCode.IntermediateFunctions}}
 <intermediate_func_def_ln_{{$i}}>
 {{$funcCode.DefinitionWithLineNumbers}}
 </intermediate_func_def_ln_{{$i}}>
 
 {{end}}
 <use_func_def_ln>
-{{.SourceCode.UseFunction.DefinitionWithLineNumbers}}
+{{.Data.SourceCode.UseFunction.DefinitionWithLineNumbers}}
 </use_func_def_ln>
 </functions>
 </uaf_report>
 
 <output_format>
-Please respond with structured JSON matching the schema.
+Please respond with structured JSON matching the schema:
+
+```json
+{{.SchemaJSON}}
+```
 
 NOTE: Set "valid" to true only if this is a genuine vulnerability.
 </output_format>

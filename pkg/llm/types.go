@@ -35,7 +35,7 @@ type UnifiedResult struct {
 	Rank *RankInfo `json:"rank,omitempty"`
 
 	// Raw data for tool-agnostic input (JSONL mode or other tools)
-	RawData map[string]interface{} `json:"raw_data,omitempty"`
+	Raw map[string]interface{} `json:"raw,omitempty"`
 
 	// Dynamic results with custom keys (for template-defined output keys)
 	DynamicResults map[string]interface{} `json:"-"`
@@ -97,11 +97,11 @@ func (ur *UnifiedResult) UnmarshalJSON(data []byte) error {
 
 	// Known field names that should be handled by regular struct unmarshaling
 	knownFields := map[string]bool{
-		"query":    true,
-		"source":   true,
-		"calls":    true,
-		"rank":     true,
-		"raw_data": true,
+		"query":  true,
+		"source": true,
+		"calls":  true,
+		"rank":   true,
+		"raw":    true,
 	}
 
 	// Separate known and dynamic fields
