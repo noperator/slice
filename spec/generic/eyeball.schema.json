@@ -1,0 +1,43 @@
+{
+  "type": "object",
+  "properties": {
+    "valid": {
+      "type": "boolean",
+      "description": "Whether at least one real, exploitable vulnerability was found in this code"
+    },
+    "findings": {
+      "type": "array",
+      "description": "Array of security vulnerabilities found in the code",
+      "items": {
+        "type": "object",
+        "properties": {
+          "vulnerability_type": {
+            "type": "string",
+            "description": "Specific type of vulnerability (e.g., SQL Injection, Buffer Overflow, Cross-site Scripting)"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"],
+            "description": "Severity level of the vulnerability"
+          },
+          "explanation": {
+            "type": "string",
+            "description": "Brief explanation of the vulnerability and why it exists in this code"
+          },
+          "exploitation_scenario": {
+            "type": "string",
+            "description": "Concrete scenario showing how an attacker could exploit this vulnerability"
+          },
+          "suggested_fix": {
+            "type": "string",
+            "description": "Concrete, actionable fix for the vulnerability with code examples if applicable"
+          }
+        },
+        "required": ["vulnerability_type", "severity", "explanation", "exploitation_scenario", "suggested_fix"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["valid", "findings"],
+  "additionalProperties": false
+}

@@ -1,0 +1,76 @@
+{{/* type: eyeball */}}
+{{/* schema_file: eyeball.schema.json */}}
+
+<context>
+I ran a static analyzer looking for OWASP Top 10 and CWE Top 25 vulnerabilities, and it flagged the following code snippet.
+</context>
+
+<code_details>
+{{if .RawData}}
+{{if .RawData.file}}**File**: {{.RawData.file}}{{end}}
+{{if .RawData.lang}}**Language**: {{.RawData.lang}}{{end}}
+{{if .RawData.kind}}**Code Type**: {{.RawData.kind}}{{end}}
+{{if .RawData.id}}**Identifier**: {{.RawData.id}}{{end}}
+
+**Static Analyzer's Finding**: {{if .RawData.finding}}"{{.RawData.finding}}"{{else}}(no specific finding mentioned){{end}}
+
+{{if .RawData.def_ln}}
+**Code Snippet**:
+```
+{{.RawData.def_ln}}
+```
+{{end}}
+{{end}}
+</code_details>
+
+<task>
+I happen to know there is at least one vulnerability in this code. Can you find it? The static analyzer suggested it might be related to the potential finding above; consider this as a hint, but feel free to explore other potential findings if you think the hint is incorrect or incomplete.
+
+Please analyze this code and return a JSON array of potential security vulnerabilities. Focus especially on (but do not necessarily limit your analysis to):
+- **OWASP Top 10** vulnerabilities (https://owasp.org/www-project-top-ten/):
+  - A01-2021: Broken Access Control
+  - A02-2021: Cryptographic Failures
+  - A03-2021: Injection
+  - A04-2021: Insecure Design
+  - A05-2021: Security Misconfiguration
+  - A06-2021: Vulnerable and Outdated Components
+  - A07-2021: Identification and Authentication Failures
+  - A08-2021: Software and Data Integrity Failures
+  - A09-2021: Security Logging and Monitoring Failures
+  - A10-2021: Server-Side Request Forgery
+- **CWE Top 25** weaknesses (https://cwe.mitre.org/top25/archive/2024/2024_cwe_top25.html):
+  - CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')
+  - CWE-787: Out-of-bounds Write
+  - CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')
+  - CWE-352: Cross-Site Request Forgery (CSRF)
+  - CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')
+  - CWE-125: Out-of-bounds Read
+  - CWE-78: Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')
+  - CWE-416: Use After Free
+  - CWE-862: Missing Authorization
+  - CWE-434: Unrestricted Upload of File with Dangerous Type
+  - CWE-94: Improper Control of Generation of Code ('Code Injection')
+  - CWE-20: Improper Input Validation
+  - CWE-77: Improper Neutralization of Special Elements used in a Command ('Command Injection')
+  - CWE-287: Improper Authentication
+  - CWE-269: Improper Privilege Management
+  - CWE-502: Deserialization of Untrusted Data
+  - CWE-200: Exposure of Sensitive Information to an Unauthorized Actor
+  - CWE-863: Incorrect Authorization
+  - CWE-918: Server-Side Request Forgery (SSRF)
+  - CWE-119: Improper Restriction of Operations within the Bounds of a Memory Buffer
+  - CWE-476: NULL Pointer Dereference
+  - CWE-798: Use of Hard-coded Credentials
+  - CWE-190: Integer Overflow or Wraparound
+  - CWE-400: Uncontrolled Resource Consumption
+  - CWE-306: Missing Authentication for Critical Function
+
+For each finding in your response, provide:
+- The specific vulnerability type (e.g., "SQL Injection", "Buffer Overflow")
+- Severity level (low/medium/high/critical)
+- A brief explanation of the vulnerability
+- Concrete exploitation scenario
+- Suggested fix
+
+Be thorough but focus on **real, likely exploitable vulnerabilities** - not purely theoretical or extremely low-impact issues.
+</task>
