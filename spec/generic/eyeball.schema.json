@@ -5,6 +5,26 @@
       "type": "boolean",
       "description": "Whether at least one real, exploitable vulnerability was found in this code"
     },
+    "behavioral_analysis": {
+      "type": "object",
+      "description": "Analysis comparing what the code appears intended to do versus what it actually does",
+      "properties": {
+        "intent": {
+          "type": "string",
+          "description": "One to three sentences describing what the code appears designed to do based on function names, comments, variable names, and context"
+        },
+        "implementation": {
+          "type": "string",
+          "description": "One to three sentences describing what the code actually does when executed"
+        },
+        "gap": {
+          "type": "string",
+          "description": "One to three sentences explaining any discrepancy between intent and implementation, and why it matters from a security perspective"
+        }
+      },
+      "required": ["intent", "implementation", "gap"],
+      "additionalProperties": false
+    },
     "findings": {
       "type": "array",
       "description": "Array of security vulnerabilities found in the code",
@@ -38,6 +58,6 @@
       }
     }
   },
-  "required": ["valid", "findings"],
+  "required": ["valid", "behavioral_analysis", "findings"],
   "additionalProperties": false
 }

@@ -26,7 +26,21 @@ I ran a static analyzer looking for OWASP Top 10 and CWE Top 25 vulnerabilities,
 <task>
 I happen to know there is at least one vulnerability in this code. Can you find it? The static analyzer suggested it might be related to the potential finding above; consider this as a hint, but feel free to explore other potential findings if you think the hint is incorrect or incomplete.
 
-Please analyze this code and return a JSON array of potential security vulnerabilities. Focus especially on (but do not necessarily limit your analysis to):
+**First, perform a behavioral analysis:**
+1. **Intent**: What does this code appear designed to do? Look at function names, comments, variable names, and context to understand the intended behavior.
+2. **Implementation**: What does the code actually do when executed? Trace through the logic step by step.
+3. **Gap**: Is there a discrepancy between what the code is trying to do and what it actually does? Common security-critical gaps include:
+   - **Authorization bypasses**: Code that checks if a permission field exists rather than validating its value
+   - **Authentication flaws**: Code that appears to verify credentials but has logic errors (e.g., comparing username but not password)
+   - **Off-by-one errors**: Boundary checks that are supposed to prevent buffer overflows but use `<=` instead of `<`
+   - **Type confusion**: Code that assumes input type but doesn't validate it, leading to injection vulnerabilities
+   - **Race conditions**: Code that checks a condition but doesn't lock properly before acting on it
+   - **Incorrect error handling**: Code that tries to fail securely but accidentally leaks information or continues execution
+   - **Business logic flaws**: Code that intends to enforce a constraint (e.g., "max 1 discount per order") but fails to properly validate it
+
+**Then, identify specific vulnerabilities:**
+
+Please analyze this code for security vulnerabilities. Focus especially on (but do not necessarily limit your analysis to):
 - **OWASP Top 10** vulnerabilities (https://owasp.org/www-project-top-ten/):
   - A01-2021: Broken Access Control
   - A02-2021: Cryptographic Failures
@@ -65,14 +79,22 @@ Please analyze this code and return a JSON array of potential security vulnerabi
   - CWE-400: Uncontrolled Resource Consumption
   - CWE-306: Missing Authentication for Critical Function
 
-For each finding in your response, provide:
-- The specific vulnerability type (e.g., "SQL Injection", "Buffer Overflow")
-- Severity level (low/medium/high/critical)
-- A brief explanation of the vulnerability
-- Concrete exploitation scenario
-- Suggested fix
+**Your response must include:**
 
-Be thorough but focus on **real, likely exploitable vulnerabilities** - not purely theoretical or extremely low-impact issues.
+1. **Behavioral Analysis** (required):
+   - `intent`: 1-3 sentences on what the code appears designed to do
+   - `implementation`: 1-3 sentences on what it actually does
+   - `gap`: 1-3 sentences on any discrepancy and its security implications
+
+2. **Vulnerability Findings** (required array, can be empty if no vulnerabilities):
+   For each finding, provide:
+   - The specific vulnerability type (e.g., "SQL Injection", "Buffer Overflow")
+   - Severity level (low/medium/high/critical)
+   - A brief explanation of the vulnerability
+   - Concrete exploitation scenario
+   - Suggested fix
+
+Be thorough but focus on **real, likely exploitable vulnerabilities** - not purely theoretical or extremely low-impact issues. The behavioral analysis may often reveal logic bugs that traditional pattern-matching misses.
 </task>
 
 <output_format>
