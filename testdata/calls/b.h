@@ -1,0 +1,3 @@
+static void duplicate(void) {
+    ;
+}

@@ -2,6 +2,7 @@ package codeql
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 
@@ -469,4 +470,46 @@ func (cg *CallGraph) haveCommonCaller(func1, func2 string, maxDepth int) bool {
 // deduplicateChains removes duplicate call chains from the slice (legacy function)
 func deduplicateChains(chains [][]string) [][]string {
 	return deduplicatePaths(chains)
+}
+
+// ShortestCallChain returns one shortest call chain by function ID, breaking ties
+// by sorted function IDs. The depth limit counts call edges.
+func (cg *CallGraph) ShortestCallChain(from, to string, maxDepth int) []string {
+	if maxDepth < 0 {
+		return nil
+	}
+	if _, err := cg.g.Vertex(from); err != nil {
+		return nil
+	}
+	parents := map[string]string{from: ""}
+	queue := []string{from}
+	for depth := 0; len(queue) > 0 && depth <= maxDepth; depth++ {
+		var next []string
+		for _, id := range queue {
+			if id == to {
+				chain := []string{id}
+				for id != from {
+					id = parents[id]
+					chain = append(chain, id)
+				}
+				for i, j := 0, len(chain)-1; i < j; i, j = i+1, j-1 {
+					chain[i], chain[j] = chain[j], chain[i]
+				}
+				return chain
+			}
+			if depth == maxDepth {
+				continue
+			}
+			neighbors := append([]string(nil), cg.edges[id]...)
+			sort.Strings(neighbors)
+			for _, neighbor := range neighbors {
+				if _, seen := parents[neighbor]; !seen {
+					parents[neighbor] = id
+					next = append(next, neighbor)
+				}
+			}
+		}
+		queue = next
+	}
+	return nil
 }
