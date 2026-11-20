@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/noperator/slice/pkg/parser"
 	"github.com/spf13/cobra"
@@ -10,28 +9,28 @@ import (
 
 var parseCmd = &cobra.Command{
 	Use:   "parse <directory>",
-	Short: "Parse code and extract function information",
-	Long: `Parse source code in the specified directory and extract detailed function information
-including signatures, parameters, variables, function calls, and definitions.`,
+	Short: "Extract functions and source lines from C files",
+	Long: `Recursively extract functions and physical source lines from regular .c and .h files.
+By default only functions are included. Use --lines for lines only, or --functions --lines for both collections.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		directory := args[0]
-
-		result, err := parser.GetCachedAnalysisResult(directory)
-		if err != nil {
-			return fmt.Errorf("failed to analyze directory: %w", err)
+		functions, _ := cmd.Flags().GetBool("functions")
+		lines, _ := cmd.Flags().GetBool("lines")
+		if !functions && !lines {
+			functions = true
 		}
-
-		output, err := json.MarshalIndent(result, "", "  ")
+		result, err := parser.ExtractDirectory(args[0], functions, lines)
 		if err != nil {
-			return fmt.Errorf("failed to marshal JSON: %w", err)
+			return err
 		}
-
-		fmt.Println(string(output))
-		return nil
+		encoder := json.NewEncoder(cmd.OutOrStdout())
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(result)
 	},
 }
 
 func init() {
+	parseCmd.Flags().Bool("functions", false, "Extract function records")
+	parseCmd.Flags().Bool("lines", false, "Extract every physical source line")
 	rootCmd.AddCommand(parseCmd)
 }

@@ -22,7 +22,8 @@ go install github.com/noperator/slice/cmd/slice@latest
 
 ### Configure
 
-Install CodeQL CLI, install pack, and build database.
+For `query`, install CodeQL CLI, install pack, and build database.
+`parse` and `relate` do not require CodeQL or an LLM.
 
 ```
 codeql pack install
@@ -38,21 +39,38 @@ codeql database create <DB_NAME> \
 $ slice -h
 Slice: SAST + LLM Interprocedural Context Extractor
 Uses CodeQL, Tree-Sitter, and LLMs to discover vulnerabilities across complex call graphs.
-Intended flow is query -> filter -> rank.
 
 Available Commands:
-  parse       Parse code and extract function information
+  parse       Extract functions and source lines from C files
+  relate      Join saved line candidates by function call relationships
   query       Run CodeQL queries and enrich results with source code
   filter      Filter CodeQL vulnerability results using LLM processing
   rank        Rank validated vulnerability findings by criticality
 
 
 $ slice parse -h
-Parse source code in the specified directory and extract detailed function information
-including signatures, parameters, variables, function calls, and definitions.
+Recursively extract functions and physical source lines from regular .c and .h files.
+By default only functions are included. Use --lines for lines only, or --functions --lines for both collections.
 
 Usage:
-  slice parse <directory>
+  slice parse <directory> [flags]
+
+Flags:
+      --functions   Extract function records
+      --lines       Extract every physical source line
+
+
+$ slice relate -h
+Join two saved lines collections using functions from saved parse output.
+Matches include the same enclosing function or a call chain in either direction.
+Call connectivity does not establish statement order, object identity, or vulnerability validity.
+
+Flags:
+      --call-depth int        Maximum call edges (nonnegative) (default 3)
+      --left string           Left candidate JSON containing lines (required)
+      --parsed string         Saved parse JSON containing functions (required)
+      --relationship string   Relationship to match: call (required)
+      --right string          Right candidate JSON containing lines (required)
 
 
 $ slice query -h
